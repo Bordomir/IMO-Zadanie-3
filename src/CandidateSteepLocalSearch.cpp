@@ -1,4 +1,4 @@
-#include "../include/SteepLocalSearch.hpp"
+#include "../include/CandidateSteepLocalSearch.hpp"
 
 #include <string>
 #include <format>
@@ -9,12 +9,12 @@
 
 using namespace std;
 
-string SteepLocalSearch::getAlgorithmName()
+string CandidateSteepLocalSearch::getAlgorithmName()
 {
     return format("Steep_{}", neighbourhoodUsed == MoveType::SwapNodes ? "SwapNodes" : "SwapEdges");
 }
 
-void SteepLocalSearch::setMoveSet()
+void CandidateSteepLocalSearch::setMoveSet()
 {
     moveSet.clear();
     int n = solution.size();
@@ -42,7 +42,7 @@ void SteepLocalSearch::setMoveSet()
         for (int i = 0; i < n; i++)
         {
             const int prev = getNodeFromSolution(i - 1);
-            const int next = getNodeFromSolution(i);
+            const int next = getNodeFromSolution(i + 1);
             moveSet.emplace_back(MoveType::InsertNode, vector{node, solution[prev], solution[next]});
         }
     }
@@ -67,7 +67,7 @@ void SteepLocalSearch::setMoveSet()
     }
 }
 
-optional<Move> SteepLocalSearch::chooseMove()
+optional<Move> CandidateSteepLocalSearch::chooseMove()
 {
     if (moveSet.empty())
         return nullopt;
@@ -89,7 +89,7 @@ optional<Move> SteepLocalSearch::chooseMove()
     return nullopt;
 }
 
-void SteepLocalSearch::updateMoveSet(const Move &move)
+void CandidateSteepLocalSearch::updateMoveSet(const Move &move)
 {
     setMoveSet();
 }

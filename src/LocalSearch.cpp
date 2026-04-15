@@ -14,6 +14,11 @@ using namespace filesystem;
 void LocalSearch::improve()
 {
     solutionScore = calculateScore();
+    inSolution.assign(data->numNodes, -1);
+    for(size_t i = 0; i < solution.size(); i++)
+    {
+        inSolution[solution[i]] = i;
+    }
     setMoveSet();
     bool hasImproved = true;
     while (hasImproved)
@@ -21,6 +26,12 @@ void LocalSearch::improve()
         hasImproved = false;
 
         optional<Move> bestMove = chooseMove();
+
+        // println("Best move:");
+        // if (bestMove)
+        //     bestMove->print();
+
+        // println("Solution: {}", solution);
 
         if (bestMove)
         {
@@ -39,107 +50,96 @@ int LocalSearch::calculateDeltaScore(const Move &move)
     {
         case MoveType::InsertNode:
         {
-            if(solution.size() == 0)
-            {
-                deltaScore += data->nodeProfits[move.node1];
+            auto [node, prev, next, u1, u2, u3] = move.nodes;
+
+            deltaScore += data->nodeProfits[node];
+            if(prev < 0 || node == prev)
                 break;
-            }
-            int prev = solution[getNodeFromSolution(*move.node2)];
-            int next = solution[getNodeFromSolution(*move.node2 + 1)];
-            deltaScore += data->nodeProfits[move.node1];
             deltaScore += data->distanceMatrix[prev][next];
-            deltaScore -= data->distanceMatrix[prev][move.node1];
-            deltaScore -= data->distanceMatrix[move.node1][next];
+            deltaScore -= data->distanceMatrix[prev][node];
+            deltaScore -= data->distanceMatrix[node][next];
             break;
         }
         case MoveType::RemoveNode:
         {
-            int prev = solution[getNodeFromSolution(*move.node2 - 1)];
-            int next = solution[getNodeFromSolution(*move.node2 + 1)];
-            deltaScore -= data->nodeProfits[move.node1];
+            auto [node, prev, next, u1, u2, u3] = move.nodes;
+            
+            deltaScore -= data->nodeProfits[node];
+            if(prev < 0 || node == prev)
+                break;
             deltaScore -= data->distanceMatrix[prev][next];
-            deltaScore += data->distanceMatrix[prev][move.node1];
-            deltaScore += data->distanceMatrix[move.node1][next];
+            deltaScore += data->distanceMatrix[prev][node];
+            deltaScore += data->distanceMatrix[node][next];
             break;
         }
         case MoveType::SwapNodes:
         {
-            if(solution.size() <= 3)
+            auto [p1, c1, n1, p2, c2, n2] = move.nodes;
+
+            if(p1 == n1)
+                break;
+
+            // edge cases
+            if(c1 == p2)
             {
-                deltaScore = 0;
+                // type: 2 | nodes: [84 , 177, 84 , 177, 84 , 177] | delta: 786
+                // type: 2 | nodes: [177, 84 , 177, 84 , 177, 84 ] | delta: 786
+                //p1 -> c1 -> n1 -> n2
+                //p1 -> p2 -> c2 -> n2
+
+                // p1 -> c2 -> c1 -> n2
+                deltaScore += data->distanceMatrix[p1][c1];
+
+                deltaScore -= data->distanceMatrix[p1][n1];
+
+                deltaScore += data->distanceMatrix[n1][n2];
+                
+                deltaScore -= data->distanceMatrix[c1][n2];
                 break;
             }
-            int prev1 = solution[getNodeFromSolution(move.node1 - 1)];
-            int curr1 = solution[move.node1];
-            int next1 = solution[getNodeFromSolution(move.node1 + 1)];
-
-            int prev2 = solution[getNodeFromSolution(*move.node2 - 1)];
-            int curr2 = solution[*move.node2];
-            int next2 = solution[getNodeFromSolution(*move.node2 + 1)];
-
-            if (curr1 == prev2)
+            if(c2 == p1)
             {
-                deltaScore += data->distanceMatrix[prev1][curr1];
+                //p2 -> c2 -> n2 -> n1
+                //p2 -> p1 -> c1 -> n1
 
-                deltaScore -= data->distanceMatrix[prev1][curr2];
+                // p2 -> c1 -> c2 -> n1
+                deltaScore += data->distanceMatrix[p2][c2];
 
-                deltaScore += data->distanceMatrix[curr2][next2];
+                deltaScore -= data->distanceMatrix[p2][n2];
 
-                deltaScore -= data->distanceMatrix[curr1][next2];
-                break;
-            }
-            if(curr2 == prev1)
-            {
-                deltaScore += data->distanceMatrix[curr1][next1];
-
-                deltaScore -= data->distanceMatrix[curr2][next1];
-
-                deltaScore += data->distanceMatrix[prev2][curr2];
-
-                deltaScore -= data->distanceMatrix[prev2][curr1];
+                deltaScore += data->distanceMatrix[n2][n1];
+                
+                deltaScore -= data->distanceMatrix[c2][n1];
                 break;
             }
 
-            deltaScore += data->distanceMatrix[prev1][curr1];
-            deltaScore += data->distanceMatrix[curr1][next1];
-            
-            deltaScore -= data->distanceMatrix[prev1][curr2];
-            deltaScore -= data->distanceMatrix[curr2][next1];
+            deltaScore += data->distanceMatrix[p1][c1];
+            deltaScore += data->distanceMatrix[c1][n1];
 
-            deltaScore += data->distanceMatrix[prev2][curr2];
-            deltaScore += data->distanceMatrix[curr2][next2];
-            
-            deltaScore -= data->distanceMatrix[prev2][curr1];
-            deltaScore -= data->distanceMatrix[curr1][next2];
+            deltaScore -= data->distanceMatrix[p1][c2];
+            deltaScore -= data->distanceMatrix[c2][n1];
 
+            deltaScore += data->distanceMatrix[p2][c2];
+            deltaScore += data->distanceMatrix[c2][n2];
+
+            deltaScore -= data->distanceMatrix[p2][c1];
+            deltaScore -= data->distanceMatrix[c1][n2];
             break;
         }
         case MoveType::SwapEdges:
         {
-            if (solution.size() <= 3)
-            {
-                deltaScore = 0;
+            auto [c1, n1, c2, n2, u1, u2] = move.nodes;
+
+            if(c1 == c2)
                 break;
-            }
-            int curr1 = solution[move.node1];
-            int next1 = solution[getNodeFromSolution(move.node1 + 1)];
 
-            int curr2 = solution[*move.node2];
-            int next2 = solution[getNodeFromSolution(*move.node2 + 1)];
+            deltaScore += data->distanceMatrix[c1][n1];
 
-            if (next1 == curr2)
-            {
-                deltaScore = 0;
-                break;
-            }
+            deltaScore -= data->distanceMatrix[c1][c2];
 
-            deltaScore += data->distanceMatrix[curr1][next1];
-
-            deltaScore -= data->distanceMatrix[curr1][curr2];
-
-            deltaScore += data->distanceMatrix[curr2][next2];
-
-            deltaScore -= data->distanceMatrix[next1][next2];
+            deltaScore += data->distanceMatrix[c2][n2];
+            
+            deltaScore -= data->distanceMatrix[n1][n2];
 
             break;
         }
@@ -151,11 +151,61 @@ int LocalSearch::getNodeFromSolution(int solutionIndex)
 {
     int n = solution.size();
     while(solutionIndex < 0) solutionIndex += n;
-    while (solutionIndex >= n) 
-    {
-        solutionIndex -= n;
-    }
+    while(solutionIndex >= n) solutionIndex -= n;
     return solutionIndex;
+}
+
+optional<Move> LocalSearch::createMove(MoveType type, int node1, int node2)
+{
+    switch (type)
+    {
+        case MoveType::InsertNode:
+        {
+            if(inSolution[node1] > -1)
+                return nullopt;
+            if(solution.size() == 0)
+                return Move{MoveType::InsertNode, vector{node1}};
+            else
+            {
+                const int index = node2;
+                const int prev = solution[getNodeFromSolution(index)];
+                const int next = solution[getNodeFromSolution(index + 1)];
+                return Move{MoveType::InsertNode, vector{node1, prev, next}};
+            }
+        }
+        case MoveType::RemoveNode:
+        {
+            if(inSolution[node1] == -1)
+                return nullopt;
+            const int index = inSolution[node1];
+            const int prev = solution[getNodeFromSolution(index - 1)];
+            const int next = solution[getNodeFromSolution(index + 1)];
+            return Move{MoveType::RemoveNode, vector{node1, prev, next}};
+        }
+        case MoveType::SwapNodes:
+        {
+            if(inSolution[node1] == -1 || inSolution[node2] == -1)
+                return nullopt;
+            const int index1 = inSolution[node1];
+            const int index2 = inSolution[node2];
+            const int p1 = solution[getNodeFromSolution(index1 - 1)];
+            const int n1 = solution[getNodeFromSolution(index1 + 1)];
+            const int p2 = solution[getNodeFromSolution(index2 - 1)];
+            const int n2 = solution[getNodeFromSolution(index2 + 1)];
+            return Move{MoveType::SwapNodes, vector{p1, node1, n1, p2, node2, n2}};
+        }
+        case MoveType::SwapEdges:
+        {
+            if(inSolution[node1] == -1 || inSolution[node2] == -1)
+                return nullopt;
+            const int index1 = inSolution[node1];
+            const int index2 = inSolution[node2];
+            const int n1 = solution[getNodeFromSolution(index1 + 1)];
+            const int n2 = solution[getNodeFromSolution(index2 + 1)];
+            return Move{MoveType::SwapEdges, vector{node1, n1, node2, n2}};
+        }
+    }
+    return nullopt;
 }
 
 void LocalSearch::changeSolution(const Move &bestMove)
@@ -165,22 +215,72 @@ void LocalSearch::changeSolution(const Move &bestMove)
     {
         case MoveType::InsertNode:
         {
-            solution.insert(solution.begin() + *bestMove.node2 + 1, bestMove.node1);
+            // solution.insert(solution.begin() + *bestMove.node2 + 1, bestMove.node1);
+            // const int n = solution.size();
+            // int newNodeSolutionIndex = *bestMove.node2 + 1;
+            // inSolution[bestMove.node1] = newNodeSolutionIndex++;
+            // for (; newNodeSolutionIndex < n; newNodeSolutionIndex++)
+            //     inSolution[solution[newNodeSolutionIndex]]++;
+            auto [node, prev, next, u1, u2, u3] = bestMove.nodes;
+
+            int insertIndex = prev < 0 || node == prev ? 0 : inSolution[prev] + 1;
+            solution.insert(solution.begin() + insertIndex, node);
+
+            const int n = solution.size();
+            inSolution[node] = insertIndex++;
+            for (; insertIndex < n; insertIndex++)
+                inSolution[solution[insertIndex]]++;
             break;
         }
         case MoveType::RemoveNode:
         {
-            solution.erase(solution.begin() + *bestMove.node2);
+            // solution.erase(solution.begin() + *bestMove.node2);
+            
+            // const int n = solution.size();
+            // int removedNodeSolutionIndex = *bestMove.node2;
+            // inSolution[bestMove.node1] = -1;
+            // for (; removedNodeSolutionIndex < n; removedNodeSolutionIndex++)
+            //     inSolution[solution[removedNodeSolutionIndex]]--;
+            auto [node, prev, next, u1, u2, u3] = bestMove.nodes;
+
+            int eraseIndex = inSolution[node];
+            solution.erase(solution.begin() + eraseIndex);
+
+            const int n = solution.size();
+            inSolution[node] = -1;
+            for (; eraseIndex < n; eraseIndex++)
+                inSolution[solution[eraseIndex]]--;
             break;
         }
         case MoveType::SwapNodes:
         {
-            swap(solution[bestMove.node1], solution[*bestMove.node2]);
+            // swap(solution[bestMove.node1], solution[*bestMove.node2]);
+            // inSolution[solution[bestMove.node1]] = bestMove.node1;
+            // inSolution[solution[*bestMove.node2]] = *bestMove.node2;
+            auto [p1, c1, n1, p2, c2, n2] = bestMove.nodes;
+
+            swap(solution[inSolution[c1]], solution[inSolution[c2]]);
+            swap(inSolution[c1], inSolution[c2]);
             break;
         }
         case MoveType::SwapEdges:
         {
-            reverse(solution.begin() + bestMove.node1 + 1, solution.begin() + *bestMove.node2 + 1);
+            // reverse(solution.begin() + bestMove.node1 + 1, solution.begin() + *bestMove.node2 + 1);
+            
+            // for (int i = bestMove.node1 + 1; i <= *bestMove.node2; i++)
+            // {
+            //     inSolution[solution[i]] = i;
+            // }
+            auto [c1, n1, c2, n2, u1, u2] = bestMove.nodes;
+            
+            const int firstIndex = inSolution[c1];
+            const int secondIndex = inSolution[c2];
+            const int reverseStartIndex = min(firstIndex, secondIndex) + 1;
+            const int reverseEndIndex = max(firstIndex, secondIndex) + 1;
+
+            reverse(solution.begin() + reverseStartIndex, solution.begin() + reverseEndIndex);
+            for (int i = reverseStartIndex; i < reverseEndIndex; i++)
+                inSolution[solution[i]] = i;
             break;
         }
     }

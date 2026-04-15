@@ -51,8 +51,8 @@ int main()
 
     vector<unique_ptr<Solver>> solvers;
     solvers.reserve(4);
-    solvers.emplace_back(make_unique<RandomSolver>(dataA));
-    solvers.emplace_back(make_unique<RandomSolver>(dataB));
+    solvers.emplace_back(make_unique<RandomSolver>(dataA, 0));
+    solvers.emplace_back(make_unique<RandomSolver>(dataB, 1));
     solvers.emplace_back(make_unique<KRegret>(dataA, startNode, 2));
     solvers.emplace_back(make_unique<KRegret>(dataB, startNode, 2));
 
@@ -63,9 +63,63 @@ int main()
     // localSearches.emplace_back(make_unique<GreedyLocalSearch>(solvers[0], MoveType::SwapEdges));
     localSearches.emplace_back(make_unique<SteepLocalSearch>(solvers[0], MoveType::SwapNodes));
     localSearches.emplace_back(make_unique<SteepLocalSearch>(solvers[0], MoveType::SwapEdges));
+    mt19937 rng{42};
+
+    auto localSearch = SteepLocalSearch(dataB, vector<int>{}, MoveType::SwapNodes);
+    localSearch.inSolution = vector<int>(dataB.numNodes, -1);
+    localSearch.solutionScore = localSearch.calculateScore();
+
+    auto mockMove = [&](MoveType type, int node1, int node2 = -1) {
+        optional<Move> optMove = localSearch.createMove(type, node1, node2);
+        if(!optMove)
+            return;
+        Move move = optMove.value();
+        // move.print();
+        localSearch.changeSolution(move);
+        localSearch.solutionScore += localSearch.calculateDeltaScore(move);
+        println("{}",localSearch.solutionScore == localSearch.calculateScore() ? "OK" : "WRONG");
+        // println("Solution:{}", localSearch.solution);
+        // println("Score:{}", localSearch.solutionScore);
+    };
+
+    println("Solution:{}", localSearch.solution);
+    println("Score:{}", localSearch.solutionScore);
+
+    mockMove(MoveType::InsertNode, rng() % dataB.numNodes);
+    for(int i = 0; i < 10; i++)
+    {
+        mockMove(MoveType::InsertNode, rng() % dataB.numNodes, rng() % localSearch.solution.size());
+    }
+    for(int i = 0; i < 1000000; i++)
+    {
+        MoveType type = static_cast<MoveType>(rng() % 4);
+        if(localSearch.solution.size() == 1 && type == MoveType::RemoveNode)
+            type = MoveType::InsertNode;
+        int node1,node2;
+        switch (type)
+        {
+        case MoveType::InsertNode:
+            node1 = rng() % dataB.numNodes;
+            node2 = rng() % localSearch.solution.size();
+            break;
+        case MoveType::RemoveNode:
+            node1 = localSearch.solution[rng() % localSearch.solution.size()];
+            break;
+        case MoveType::SwapNodes:
+            node1 = localSearch.solution[rng() % localSearch.solution.size()];
+            node2 = localSearch.solution[rng() % localSearch.solution.size()];
+            break;
+        case MoveType::SwapEdges:
+            node1 = localSearch.solution[rng() % localSearch.solution.size()];
+            node2 = localSearch.solution[rng() % localSearch.solution.size()];
+            break;
+        }
+        mockMove(type, node1, node2);
+    }
+
+    exit(0);
 
     // Experiment
-    mt19937 rng{random_device{}()};
     int numRuns = 100;
     int maxNode = min(dataA.numNodes, dataB.numNodes);
     int maxTestsPossible = min(numRuns, maxNode);
