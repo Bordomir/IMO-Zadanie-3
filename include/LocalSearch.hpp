@@ -14,15 +14,10 @@ using namespace std;
 
 enum class MoveType
 {
-    InsertNode = 0, // wstawienie wierzchołka data[node1] po wierzchołku solution[node2]
-    RemoveNode = 1, // usunięcie wierzchołka data[node1] z miejsca node2 = solution[data[node1]]
-    SwapNodes = 2, // zamiana wierzchołków solution[node1] i solution[node2] (node1 < node2)
-    SwapEdges = 3 // zamiana krawędzi solution[node1] -> solution[node1 + 1] z krawędzią solution[node2] -> solution[node2 + 1] (node1 < node2)
-    // Zmiana w interpretacji
-    // InsertNode - (node, prev, next = nodes) wstawienie wierzchołka node pomiędzy wierzchołki prev i next lub na sam początek jeżeli prev < 0 lub node == prev
-    // RemoveNode - (node, prev, next = nodes) usunięcie wierzchołka node który był pomiędzy wierzchołkami prev i next lub na samym początku jeżeli prev < 0 lub node == prev
-    // SwapNodes - (p1, c1, n1, p2, c2, n2 = nodes) zamiana wierchołków c1 i c2 w otoczeniach p1, n1 i p2, n2
-    // SwapEdges - (c1, n1, c2, n2 = nodes) zamiana krawędzi c1 -> n1 z krawędzią c2 -> n2
+    InsertNode = 0, // (node, prev, next = nodes) wstawienie wierzchołka node pomiędzy wierzchołki prev i next lub na sam początek jeżeli prev < 0 lub node == prev
+    RemoveNode = 1, // (node, prev, next = nodes) usunięcie wierzchołka node który był pomiędzy wierzchołkami prev i next lub na samym początku jeżeli prev < 0 lub node == prev
+    SwapNodes = 2, // (p1, c1, n1, p2, c2, n2 = nodes) zamiana wierchołków c1 i c2 w otoczeniach p1, n1 i p2, n2
+    SwapEdges = 3 // (c1, n1, c2, n2 = nodes) zamiana krawędzi c1 -> n1 z krawędzią c2 -> n2
 };
 
 struct Move 
@@ -31,18 +26,15 @@ struct Move
     array<int, 6> nodes;
     optional<int> deltaScore;
     
-    // int node1;
-    // optional<int> node2;
-    // optional<int> deltaScore;
-    // optional<int> succNode1; // = solution[node1 + 1]
-    // optional<int> succNode2; // = solution[node2 + 1]
-
-    // Move(MoveType type, int node1, optional<int> node2 = nullopt, optional<int> deltaScore = nullopt, optional<int> succNode1 = nullopt, optional<int> succNode2 = nullopt) : type(type), node1(node1), node2(node2), deltaScore(deltaScore), succNode1(succNode1), succNode2(succNode2) {}
-    Move(MoveType type, vector<int> &&nodes, optional<int> deltaScore = nullopt) : type(type), nodes(), deltaScore(deltaScore) 
+    Move(MoveType type, initializer_list<int> nodes, optional<int> deltaScore = nullopt) : type(type), nodes(), deltaScore(deltaScore) 
     {
         this->nodes.fill(-1);
-        for(size_t i = 0; i < nodes.size() && i < 6; i++)
-            this->nodes[i] = nodes[i];
+        size_t i = 0;
+        for(int node : nodes)
+        {
+            if(i >= 6) break;
+            this->nodes[i++] = node;
+        }
     }
 
     bool operator<(const Move &other) const
@@ -90,7 +82,12 @@ public:
     void improve();
     int calculateDeltaScore(const Move &move);
     int getNodeFromSolution(int solutionIndex);
-    optional<Move> createMove(MoveType type, int node1, int node2 = -1);
+    bool checkMove(MoveType type, int node1, int node2 = -1);
+    bool checkMove(Move move);
+    template<bool areIndicesGiven = true>
+    Move createMove(MoveType type, int index1, int index2 = -1);
+    template<bool areIndicesGiven = true>
+    void addMove(MoveType type, int index1, int index2 = -1);
     virtual optional<Move> chooseMove() = 0;
     void changeSolution(const Move &move);
     virtual void setMoveSet() = 0;
@@ -101,3 +98,63 @@ public:
     void print();
     void saveToFile(const string &filename = "");
 };
+
+template<bool areIndicesGiven>
+void LocalSearch::addMove(MoveType type, int index1, int index2)
+{
+    moveSet.emplace_back(createMove<areIndicesGiven>(type, index1, index2));
+}
+template<bool areIndicesGiven>
+Move LocalSearch::createMove(MoveType type, int index1, int index2)
+{
+    switch (type)
+    {
+        default:
+        case MoveType::InsertNode:
+        {
+            if(solution.size() == 0)
+                return Move{MoveType::InsertNode, {index1}};
+            else
+            {
+                const int index = areIndicesGiven ? index2 : inSolution[index2];
+                const int prev = solution[getNodeFromSolution(index)];
+                const int next = solution[getNodeFromSolution(index + 1)];
+                return Move{MoveType::InsertNode, {index1, prev, next}};
+            }
+            break;
+        }
+        case MoveType::RemoveNode:
+        {
+            const int index = areIndicesGiven ? index1 : inSolution[index1];
+            const int node = areIndicesGiven ? solution[index1] : index1;
+            const int prev = solution[getNodeFromSolution(index - 1)];
+            const int next = solution[getNodeFromSolution(index + 1)];
+            return Move{MoveType::RemoveNode, {node, prev, next}};
+            break;
+        }
+        case MoveType::SwapNodes:
+        {
+            const int solutionIndex1 = areIndicesGiven ? index1 : inSolution[index1];
+            const int solutionIndex2 = areIndicesGiven ? index2 : inSolution[index2];
+            const int c1 = areIndicesGiven ? solution[index1] : index1;
+            const int c2 = areIndicesGiven ? solution[index2] : index2;
+            const int p1 = solution[getNodeFromSolution(solutionIndex1 - 1)];
+            const int n1 = solution[getNodeFromSolution(solutionIndex1 + 1)];
+            const int p2 = solution[getNodeFromSolution(solutionIndex2 - 1)];
+            const int n2 = solution[getNodeFromSolution(solutionIndex2 + 1)];
+            return Move{MoveType::SwapNodes, {p1, c1, n1, p2, c2, n2}};
+            break;
+        }
+        case MoveType::SwapEdges:
+        {
+            const int solutionIndex1 = areIndicesGiven ? index1 : inSolution[index1];
+            const int solutionIndex2 = areIndicesGiven ? index2 : inSolution[index2];
+            const int c1 = areIndicesGiven ? solution[index1] : index1;
+            const int c2 = areIndicesGiven ? solution[index2] : index2;
+            const int n1 = solution[getNodeFromSolution(solutionIndex1 + 1)];
+            const int n2 = solution[getNodeFromSolution(solutionIndex2 + 1)];
+            return Move{MoveType::SwapEdges, {c1, n1, c2, n2}};
+            break;
+        }
+    }
+}

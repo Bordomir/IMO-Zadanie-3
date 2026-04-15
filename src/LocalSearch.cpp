@@ -27,12 +27,6 @@ void LocalSearch::improve()
 
         optional<Move> bestMove = chooseMove();
 
-        // println("Best move:");
-        // if (bestMove)
-        //     bestMove->print();
-
-        // println("Solution: {}", solution);
-
         if (bestMove)
         {
             hasImproved = true;
@@ -82,8 +76,6 @@ int LocalSearch::calculateDeltaScore(const Move &move)
             // edge cases
             if(c1 == p2)
             {
-                // type: 2 | nodes: [84 , 177, 84 , 177, 84 , 177] | delta: 786
-                // type: 2 | nodes: [177, 84 , 177, 84 , 177, 84 ] | delta: 786
                 //p1 -> c1 -> n1 -> n2
                 //p1 -> p2 -> c2 -> n2
 
@@ -155,72 +147,80 @@ int LocalSearch::getNodeFromSolution(int solutionIndex)
     return solutionIndex;
 }
 
-optional<Move> LocalSearch::createMove(MoveType type, int node1, int node2)
+bool LocalSearch::checkMove(MoveType type, int node1, int node2)
 {
     switch (type)
     {
         case MoveType::InsertNode:
         {
             if(inSolution[node1] > -1)
-                return nullopt;
-            if(solution.size() == 0)
-                return Move{MoveType::InsertNode, vector{node1}};
-            else
-            {
-                const int index = node2;
-                const int prev = solution[getNodeFromSolution(index)];
-                const int next = solution[getNodeFromSolution(index + 1)];
-                return Move{MoveType::InsertNode, vector{node1, prev, next}};
-            }
+                return false;
+            break;
         }
         case MoveType::RemoveNode:
         {
             if(inSolution[node1] == -1)
-                return nullopt;
-            const int index = inSolution[node1];
-            const int prev = solution[getNodeFromSolution(index - 1)];
-            const int next = solution[getNodeFromSolution(index + 1)];
-            return Move{MoveType::RemoveNode, vector{node1, prev, next}};
+                return false;
+            break;
         }
         case MoveType::SwapNodes:
         {
             if(inSolution[node1] == -1 || inSolution[node2] == -1)
-                return nullopt;
-            const int index1 = inSolution[node1];
-            const int index2 = inSolution[node2];
-            const int p1 = solution[getNodeFromSolution(index1 - 1)];
-            const int n1 = solution[getNodeFromSolution(index1 + 1)];
-            const int p2 = solution[getNodeFromSolution(index2 - 1)];
-            const int n2 = solution[getNodeFromSolution(index2 + 1)];
-            return Move{MoveType::SwapNodes, vector{p1, node1, n1, p2, node2, n2}};
+                return false;
+            break;
         }
         case MoveType::SwapEdges:
         {
             if(inSolution[node1] == -1 || inSolution[node2] == -1)
-                return nullopt;
-            const int index1 = inSolution[node1];
-            const int index2 = inSolution[node2];
-            const int n1 = solution[getNodeFromSolution(index1 + 1)];
-            const int n2 = solution[getNodeFromSolution(index2 + 1)];
-            return Move{MoveType::SwapEdges, vector{node1, n1, node2, n2}};
+                return false;
+            break;
         }
     }
-    return nullopt;
+    return true;
+}
+bool LocalSearch::checkMove(Move move)
+{
+    MoveType type = move.type;
+    switch (type)
+    {
+        case MoveType::InsertNode:
+        {
+            auto [node, prev, next, u1, u2, u3] = move.nodes;
+            if(inSolution[node] > -1)
+                return false;
+            break;
+        }
+        case MoveType::RemoveNode:
+        {
+            auto [node, prev, next, u1, u2, u3] = move.nodes;
+            if(inSolution[node] == -1)
+                return false;
+            break;
+        }
+        case MoveType::SwapNodes:
+        {
+            auto [p1, c1, n1, p2, c2, n2] = move.nodes;
+            if(inSolution[c1] == -1 || inSolution[c2] == -1)
+                return false;
+            break;
+        }
+        case MoveType::SwapEdges:
+        {
+            auto [c1, n1, c2, n2, u1, u2] = move.nodes;
+            if(inSolution[c1] == -1 || inSolution[c2] == -1)
+                return false;
+            break;
+        }
+    }
+    return true;
 }
 
 void LocalSearch::changeSolution(const Move &bestMove)
 {
-    // TODO: Test this function, especially SwapEdges
     switch (bestMove.type)
     {
         case MoveType::InsertNode:
         {
-            // solution.insert(solution.begin() + *bestMove.node2 + 1, bestMove.node1);
-            // const int n = solution.size();
-            // int newNodeSolutionIndex = *bestMove.node2 + 1;
-            // inSolution[bestMove.node1] = newNodeSolutionIndex++;
-            // for (; newNodeSolutionIndex < n; newNodeSolutionIndex++)
-            //     inSolution[solution[newNodeSolutionIndex]]++;
             auto [node, prev, next, u1, u2, u3] = bestMove.nodes;
 
             int insertIndex = prev < 0 || node == prev ? 0 : inSolution[prev] + 1;
@@ -234,13 +234,6 @@ void LocalSearch::changeSolution(const Move &bestMove)
         }
         case MoveType::RemoveNode:
         {
-            // solution.erase(solution.begin() + *bestMove.node2);
-            
-            // const int n = solution.size();
-            // int removedNodeSolutionIndex = *bestMove.node2;
-            // inSolution[bestMove.node1] = -1;
-            // for (; removedNodeSolutionIndex < n; removedNodeSolutionIndex++)
-            //     inSolution[solution[removedNodeSolutionIndex]]--;
             auto [node, prev, next, u1, u2, u3] = bestMove.nodes;
 
             int eraseIndex = inSolution[node];
@@ -254,9 +247,6 @@ void LocalSearch::changeSolution(const Move &bestMove)
         }
         case MoveType::SwapNodes:
         {
-            // swap(solution[bestMove.node1], solution[*bestMove.node2]);
-            // inSolution[solution[bestMove.node1]] = bestMove.node1;
-            // inSolution[solution[*bestMove.node2]] = *bestMove.node2;
             auto [p1, c1, n1, p2, c2, n2] = bestMove.nodes;
 
             swap(solution[inSolution[c1]], solution[inSolution[c2]]);
@@ -265,12 +255,6 @@ void LocalSearch::changeSolution(const Move &bestMove)
         }
         case MoveType::SwapEdges:
         {
-            // reverse(solution.begin() + bestMove.node1 + 1, solution.begin() + *bestMove.node2 + 1);
-            
-            // for (int i = bestMove.node1 + 1; i <= *bestMove.node2; i++)
-            // {
-            //     inSolution[solution[i]] = i;
-            // }
             auto [c1, n1, c2, n2, u1, u2] = bestMove.nodes;
             
             const int firstIndex = inSolution[c1];

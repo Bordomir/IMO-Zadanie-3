@@ -22,9 +22,7 @@ void MemorySteepLocalSearch::setMoveSet()
     // RemoveNode moves - usunięcie wierzchołka solution[node1]
     for (int i = 0; i < n; i++)
     {
-        const int prev = getNodeFromSolution(i - 1);
-        const int next = getNodeFromSolution(i + 1);
-        moveSet.emplace_back(MoveType::RemoveNode, vector{solution[i], solution[prev], solution[next]});
+        addMove<true>(MoveType::RemoveNode, i);
     }
 
     // InsertNode moves - wstawienie wierzchołka data[node1] po wierzchołku solution[node2]
@@ -35,15 +33,13 @@ void MemorySteepLocalSearch::setMoveSet()
 
         if (n == 0)
         {
-            moveSet.emplace_back(MoveType::InsertNode, vector{node});
+            addMove<true>(MoveType::InsertNode, node);
             continue;
         }
 
         for (int i = 0; i < n; i++)
         {
-            const int prev = getNodeFromSolution(i - 1);
-            const int next = getNodeFromSolution(i + 1);
-            moveSet.emplace_back(MoveType::InsertNode, vector{node, solution[prev], solution[next]});
+            addMove<true>(MoveType::InsertNode, node, i);
         }
     }
 
@@ -53,16 +49,7 @@ void MemorySteepLocalSearch::setMoveSet()
     {
         for (int j = i + 1; j < n; j++)
         {
-            const int p1 = solution[getNodeFromSolution(i - 1)];
-            const int c1 = solution[i];
-            const int n1 = solution[getNodeFromSolution(i + 1)];
-            const int p2 = solution[getNodeFromSolution(j - 1)];
-            const int c2 = solution[j];
-            const int n2 = solution[getNodeFromSolution(j + 1)];
-            if(neighbourhoodUsed == MoveType::SwapNodes)
-                moveSet.emplace_back(MoveType::SwapNodes, vector{p1, c1, n1, p2, c2, n2});
-            else
-                moveSet.emplace_back(MoveType::SwapEdges, vector{c1, n1, c2, n2});
+            addMove<true>(neighbourhoodUsed, i, j);
         }
     }
 }
