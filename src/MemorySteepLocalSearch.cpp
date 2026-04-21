@@ -18,6 +18,8 @@ string MemorySteepLocalSearch::getAlgorithmName()
 void MemorySteepLocalSearch::setMoveSet()
 {
     moveSet.clear();
+    moveSetQueue = priority_queue<int, vector<int>, MoveIndexComparator>(MoveIndexComparator{&moveSet});
+    
     int n = solution.size();
 
     for (int i = 0; i < n; i++)
@@ -50,30 +52,41 @@ void MemorySteepLocalSearch::setMoveSet()
         }
     }
 
-    moveSetQueue = priority_queue<Move>(moveSet.begin(), moveSet.end());
-    moveSet.clear();
+    removedMoves = vector<int>();
+    validMoves = vector<int>();
 }
 
 optional<Move> MemorySteepLocalSearch::chooseMove()
 {
-    int res = 0;
-    optional<Move> m = nullopt;
-    while(!moveSetQueue.empty() && res != 1)
+    while(!moveSetQueue.empty())
     {
-        m = moveSetQueue.top();
+        int bestIndex = moveSetQueue.top();
         moveSetQueue.pop();
-        res = isMoveApplicable(*m);
+
+        Move &m = moveSet[bestIndex];
+
+        int res = isMoveApplicable(m);
         if(res == -1)
         {
-            moveSet.push_back(move(*m));
+            validMoves.push_back(bestIndex);
+        } else
+        {
+            removedMoves.push_back(bestIndex);
         }
+
+        if(res == 1) return m;
     }
-    if(res == 1) return m;
     return nullopt;
 }
 
 void MemorySteepLocalSearch::updateMoveSet(const Move &move)
 {
+    while(!validMoves.empty())
+    {
+        int index = validMoves.back();
+        validMoves.pop_back();
+        moveSetQueue.push(index);
+    }
     switch (move.type)
     {
         case MoveType::InsertNode:
@@ -190,11 +203,5 @@ void MemorySteepLocalSearch::updateMoveSet(const Move &move)
             break;
         }
     }
-    extendQueue();
-    moveSet.clear();
 }
 
-void MemorySteepLocalSearch::extendQueue()
-{
-    moveSetQueue.push_range(moveSet);
-}

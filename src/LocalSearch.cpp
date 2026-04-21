@@ -31,7 +31,7 @@ void LocalSearch::improve()
         {
             hasImproved = true;
             changeSolution(*bestMove);
-            solutionScore += *bestMove->deltaScore;
+            solutionScore += bestMove->deltaScore;
             updateMoveSet(*bestMove);
         }
     }
@@ -256,9 +256,9 @@ void LocalSearch::changeSolution(const Move &bestMove)
         case MoveType::SwapEdges:
         {
             auto [c1, n1, c2, n2, u1, u2] = bestMove.nodes;
-            
-            const int firstIndex = inSolution[c1];
-            const int secondIndex = inSolution[c2];
+
+            const int firstIndex = checkEdge(c1, n1) > 0 ? inSolution[c1] : inSolution[n1];
+            const int secondIndex = checkEdge(c2, n2) > 0 ? inSolution[c2] : inSolution[n2];
             const int reverseStartIndex = min(firstIndex, secondIndex) + 1;
             const int reverseEndIndex = max(firstIndex, secondIndex) + 1;
 
@@ -280,7 +280,8 @@ int LocalSearch::checkEdge(int node1, int node2)
     int absDiff = abs(diff);
 
     int maxDiff = solution.size() - 1;
-    if(absDiff == 1 || absDiff == maxDiff) return absDiff == diff ? 1 : -1;
+    if(absDiff == maxDiff) return index2 == 0 ? 1 : -1; // Edge case for circular solution
+    if(absDiff == 1) return diff > 0 ? 1 : -1;
 
     return 0;
 }
@@ -291,6 +292,7 @@ int LocalSearch::isMoveApplicable(const Move &m)
         case MoveType::InsertNode:
         {
             auto [node, prev, next, u1, u2, u3] = m.nodes;
+            if(inSolution[node] > -1) return 0;
             if(prev < 0)
             {
                 return solution.empty() ? 1 : 0;

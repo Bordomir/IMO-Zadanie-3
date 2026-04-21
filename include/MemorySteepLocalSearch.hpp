@@ -12,21 +12,34 @@
 
 using namespace std;
 
+struct MoveIndexComparator
+{
+    const vector<Move> *movePool;
+    bool operator()(const int idx1, const int idx2) const
+    {
+        return (*movePool)[idx1].deltaScore < (*movePool)[idx2].deltaScore;
+    }
+};
+
+using MoveIndexQueue = priority_queue<int, vector<int>, MoveIndexComparator>;
+
 class MemorySteepLocalSearch : public LocalSearch
 {
 public:
-    priority_queue<Move> moveSetQueue;
+    // priority_queue<Move> moveSetQueue;
+    MoveIndexQueue moveSetQueue;
+    vector<int> validMoves;
+    vector<int> removedMoves;
     // unordered_map<MoveType, unordered_map<int, unordered_map<int, int>>> moveSetMap;
 
-    MemorySteepLocalSearch(unique_ptr<Solver> &solver, MoveType neighbourhood = MoveType::SwapEdges) : LocalSearch(solver, neighbourhood) {};
-    MemorySteepLocalSearch(DataLoader &data, vector<int> solution, MoveType neighbourhood = MoveType::SwapEdges) : LocalSearch(data, solution, neighbourhood) {};
+    MemorySteepLocalSearch(unique_ptr<Solver> &solver, MoveType neighbourhood = MoveType::SwapEdges) : LocalSearch(solver, neighbourhood), moveSetQueue(MoveIndexComparator{&moveSet}) {};
+    MemorySteepLocalSearch(DataLoader &data, vector<int> solution, MoveType neighbourhood = MoveType::SwapEdges) : LocalSearch(data, solution, neighbourhood), moveSetQueue(MoveIndexComparator{&moveSet}) {};
     string getAlgorithmName() override;
     void setMoveSet() override;
     optional<Move> chooseMove() override;
     void updateMoveSet(const Move &move) override;
     template<bool areIndicesGiven = true>
     void addImprovingMove(MoveType type, int index1, int index2 = -1);
-    void extendQueue();
 };
 
 
@@ -35,9 +48,20 @@ void MemorySteepLocalSearch::addImprovingMove(MoveType type, int index1, int ind
 {
     Move m = createMove<areIndicesGiven>(type, index1, index2);
     m.deltaScore = calculateDeltaScore(m);
-    if(*m.deltaScore > 0)
+    if(m.deltaScore > 0)
     {
-        moveSet.push_back(move(m));
+        if(removedMoves.size() > 0)
+        {
+            int reuseIndex = removedMoves.back();
+            moveSet[reuseIndex] = move(m);
+            moveSetQueue.push(reuseIndex);
+            removedMoves.pop_back();
+        }
+        else
+        {
+            moveSet.push_back(move(m));
+            moveSetQueue.push(moveSet.size() - 1);
+        }
     }
     if(type == MoveType::SwapEdges)
     {
@@ -49,9 +73,20 @@ void MemorySteepLocalSearch::addImprovingMove(MoveType type, int index1, int ind
         const int c2 = solution[getNodeFromSolution(solutionIndex2 + 1)];
         Move m2{MoveType::SwapEdges, {c1, n1, c2, n2}};
         m2.deltaScore = calculateDeltaScore(m2);
-        if(*m2.deltaScore > 0)
+        if(m2.deltaScore > 0)
         {
-            moveSet.push_back(move(m2));
+            if(removedMoves.size() > 0)
+            {
+                int reuseIndex = removedMoves.back();
+                moveSet[reuseIndex] = move(m2);
+                moveSetQueue.push(reuseIndex);
+                removedMoves.pop_back();
+            }
+            else
+            {
+                moveSet.push_back(move(m2));
+                moveSetQueue.push(moveSet.size() - 1);
+            }
         }
     }
 }

@@ -60,16 +60,15 @@ optional<Move> SteepLocalSearch::chooseMove()
         return nullopt;
 
     Move bestMove = moveSet[0];
-    bestMove.deltaScore = -1;
     for (Move &move : moveSet)
     {
         move.deltaScore = calculateDeltaScore(move);
-        if (*move.deltaScore > *bestMove.deltaScore)
+        if (move.deltaScore > bestMove.deltaScore)
         {
             bestMove = move;
         }
     }
-    if (*bestMove.deltaScore > 0)
+    if (bestMove.deltaScore > 0)
     {
         return bestMove;
     }

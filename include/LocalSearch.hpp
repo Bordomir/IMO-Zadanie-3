@@ -24,9 +24,9 @@ struct Move
 {
     MoveType type;
     array<int, 6> nodes;
-    optional<int> deltaScore;
+    int deltaScore;
     
-    Move(MoveType type, initializer_list<int> nodes, optional<int> deltaScore = nullopt) : type(type), nodes(), deltaScore(deltaScore) 
+    Move(MoveType type, initializer_list<int> nodes, int deltaScore = -1) : type(type), nodes(), deltaScore(deltaScore) 
     {
         this->nodes.fill(-1);
         size_t i = 0;
@@ -39,7 +39,7 @@ struct Move
 
     bool operator<(const Move &other) const
     {
-        return deltaScore.value_or(numeric_limits<int>::min()) < other.deltaScore.value_or(numeric_limits<int>::min());
+        return deltaScore < other.deltaScore;
     }
 
 void print() const
@@ -53,7 +53,7 @@ void print() const
         nodes[3], 
         nodes[4], 
         nodes[5],
-        deltaScore.value_or(0)
+        deltaScore
     );
 }
 };
