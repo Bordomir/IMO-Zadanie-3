@@ -11,7 +11,7 @@ using namespace std;
 
 string CandidateSteepLocalSearch::getAlgorithmName()
 {
-    return format("Steep_{}", neighbourhoodUsed == MoveType::SwapNodes ? "SwapNodes" : "SwapEdges");
+    return format("Candidate_Steep_{}", neighbourhoodUsed == MoveType::SwapNodes ? "SwapNodes" : "SwapEdges");
 }
 
 void CandidateSteepLocalSearch::setMoveSet()
@@ -64,12 +64,12 @@ optional<Move> CandidateSteepLocalSearch::chooseMove()
     for (Move &move : moveSet)
     {
         move.deltaScore = calculateDeltaScore(move);
-        if (*move.deltaScore > *bestMove.deltaScore)
+        if (move.deltaScore > bestMove.deltaScore)
         {
             bestMove = move;
         }
     }
-    if (*bestMove.deltaScore > 0)
+    if (bestMove.deltaScore > 0)
     {
         return bestMove;
     }

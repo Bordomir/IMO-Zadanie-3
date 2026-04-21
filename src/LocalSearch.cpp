@@ -31,7 +31,7 @@ void LocalSearch::improve()
         {
             hasImproved = true;
             changeSolution(*bestMove);
-            solutionScore += *bestMove->deltaScore;
+            solutionScore += bestMove->deltaScore;
             updateMoveSet(*bestMove);
         }
     }
@@ -47,7 +47,7 @@ int LocalSearch::calculateDeltaScore(const Move &move)
             auto [node, prev, next, u1, u2, u3] = move.nodes;
 
             deltaScore += data->nodeProfits[node];
-            if(prev < 0 || node == prev)
+            if(prev < 0)
                 break;
             deltaScore += data->distanceMatrix[prev][next];
             deltaScore -= data->distanceMatrix[prev][node];
@@ -223,7 +223,7 @@ void LocalSearch::changeSolution(const Move &bestMove)
         {
             auto [node, prev, next, u1, u2, u3] = bestMove.nodes;
 
-            int insertIndex = prev < 0 || node == prev ? 0 : inSolution[prev] + 1;
+            int insertIndex = prev < 0 ? 0 : ((checkEdge(prev, next) > 0 ? inSolution[prev] : inSolution[next]) + 1);
             solution.insert(solution.begin() + insertIndex, node);
 
             const int n = solution.size();
@@ -256,9 +256,9 @@ void LocalSearch::changeSolution(const Move &bestMove)
         case MoveType::SwapEdges:
         {
             auto [c1, n1, c2, n2, u1, u2] = bestMove.nodes;
-            
-            const int firstIndex = inSolution[c1];
-            const int secondIndex = inSolution[c2];
+
+            const int firstIndex = checkEdge(c1, n1) > 0 ? inSolution[c1] : inSolution[n1];
+            const int secondIndex = checkEdge(c2, n2) > 0 ? inSolution[c2] : inSolution[n2];
             const int reverseStartIndex = min(firstIndex, secondIndex) + 1;
             const int reverseEndIndex = max(firstIndex, secondIndex) + 1;
 
@@ -269,7 +269,72 @@ void LocalSearch::changeSolution(const Move &bestMove)
         }
     }
 }
-int LocalSearch::calculateLength()
+int LocalSearch::checkEdge(int node1, int node2)
+{
+    int index1 = inSolution[node1];
+    int index2 = inSolution[node2];
+
+    if(index1 == -1 || index2 == -1) return 0;
+
+    int diff = index2 - index1;
+    int absDiff = abs(diff);
+
+    int maxDiff = solution.size() - 1;
+    if(absDiff == maxDiff) return index2 == 0 ? 1 : -1; // Edge case for circular solution
+    if(absDiff == 1) return diff > 0 ? 1 : -1;
+
+    return 0;
+}
+int LocalSearch::isMoveApplicable(const Move &m)
+{
+    switch (m.type)
+    {
+        case MoveType::InsertNode:
+        {
+            auto [node, prev, next, u1, u2, u3] = m.nodes;
+            if(inSolution[node] > -1) return 0;
+            if(prev < 0)
+            {
+                return solution.empty() ? 1 : 0;
+            } 
+            else
+            {
+                return abs(checkEdge(prev, next));
+            }
+            break;
+        }
+        case MoveType::RemoveNode:
+        {
+            auto [node, prev, next, u1, u2, u3] = m.nodes;
+            int e1 = checkEdge(prev, node);
+            int e2 = checkEdge(node, next);
+            return e1 * e2;
+            break;
+        }
+        case MoveType::SwapNodes:
+        {
+            auto [p1, c1, n1, p2, c2, n2] = m.nodes;
+            int e1 = checkEdge(p1, c1);
+            int e2 = checkEdge(c1, n1);
+            int e3 = checkEdge(p2, c2);
+            int e4 = checkEdge(c2, n2);
+            int s1 = e1 * e2;
+            int s2 = e3 * e4;
+            return s1 * s2;
+            break;
+        }
+        case MoveType::SwapEdges:
+        {
+            auto [c1, n1, c2, n2, u1, u2] = m.nodes;
+            int e1 = checkEdge(c1, n1);
+            int e2 = checkEdge(c2, n2);
+            return e1 * e2;
+            break;
+        }
+    }
+    return 0;
+}
+int LocalSearch::calculateLength() 
 {
     int score = 0;
     if (solution.size() == 0)

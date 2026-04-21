@@ -14,9 +14,9 @@
 #include "../include/RandomSolver.hpp"
 #include "../include/KRegret.hpp"
 #include "../include/LocalSearch.hpp"
-// #include "../include/RandomLocalSearch.hpp"
-// #include "../include/GreedyLocalSearch.hpp"
 #include "../include/SteepLocalSearch.hpp"
+#include "../include/MemorySteepLocalSearch.hpp"
+#include "../include/CandidateSteepLocalSearch.hpp"
 
 using namespace std;
 
@@ -49,76 +49,33 @@ int main()
 
     int startNode = 0;
 
-    vector<unique_ptr<Solver>> solvers;
-    solvers.reserve(4);
-    solvers.emplace_back(make_unique<RandomSolver>(dataA, 0));
-    solvers.emplace_back(make_unique<RandomSolver>(dataB, 1));
-    solvers.emplace_back(make_unique<KRegret>(dataA, startNode, 2));
-    solvers.emplace_back(make_unique<KRegret>(dataB, startNode, 2));
+    vector<unique_ptr<Solver>> startingPointSolvers;
+    startingPointSolvers.reserve(2);
+    startingPointSolvers.emplace_back(make_unique<RandomSolver>(dataA, 0));
+    startingPointSolvers.emplace_back(make_unique<RandomSolver>(dataB, 1));
+    
+    vector<unique_ptr<Solver>> KRegrets;
+    KRegrets.reserve(2);
+    KRegrets.emplace_back(make_unique<KRegret>(dataA, startNode, 2));
+    KRegrets.emplace_back(make_unique<KRegret>(dataB, startNode, 2));
 
 
     vector<unique_ptr<LocalSearch>> localSearches;
-    localSearches.reserve(4);
-    // localSearches.emplace_back(make_unique<GreedyLocalSearch>(solvers[0], MoveType::SwapNodes));
-    // localSearches.emplace_back(make_unique<GreedyLocalSearch>(solvers[0], MoveType::SwapEdges));
-    localSearches.emplace_back(make_unique<SteepLocalSearch>(solvers[0], MoveType::SwapNodes));
-    localSearches.emplace_back(make_unique<SteepLocalSearch>(solvers[0], MoveType::SwapEdges));
+    localSearches.reserve(3);
+    localSearches.emplace_back(make_unique<SteepLocalSearch>(startingPointSolvers[0], MoveType::SwapEdges));
+    localSearches.emplace_back(make_unique<MemorySteepLocalSearch>(startingPointSolvers[0], MoveType::SwapEdges));
+    localSearches.emplace_back(make_unique<CandidateSteepLocalSearch>(startingPointSolvers[0], MoveType::SwapEdges));
     mt19937 rng{42};
 
-    // auto localSearch = SteepLocalSearch(dataB, vector<int>{}, MoveType::SwapNodes);
-    // localSearch.inSolution = vector<int>(dataB.numNodes, -1);
-    // localSearch.solutionScore = localSearch.calculateScore();
+    // unique_ptr<Solver> randomSolverA = make_unique<RandomSolver>(dataA, startNode);
+    // randomSolverA->solve();
+    // MemorySteepLocalSearch localSearch(randomSolverA, MoveType::SwapEdges);
+    // localSearch.improve();
 
-    // auto mockMove = [&](MoveType type, int node1, int node2 = -1) {
-    //     optional<Move> optMove = localSearch.createMove(type, node1, node2);
-    //     if(!optMove)
-    //         return;
-    //     Move move = optMove.value();
-    //     // move.print();
-    //     localSearch.changeSolution(move);
-    //     localSearch.solutionScore += localSearch.calculateDeltaScore(move);
-    //     println("{}",localSearch.solutionScore == localSearch.calculateScore() ? "OK" : "WRONG");
-    //     // println("Solution:{}", localSearch.solution);
-    //     // println("Score:{}", localSearch.solutionScore);
-    // };
-
-    // println("Solution:{}", localSearch.solution);
-    // println("Score:{}", localSearch.solutionScore);
-
-    // mockMove(MoveType::InsertNode, rng() % dataB.numNodes);
-    // for(int i = 0; i < 10; i++)
-    // {
-    //     mockMove(MoveType::InsertNode, rng() % dataB.numNodes, rng() % localSearch.solution.size());
-    // }
-    // for(int i = 0; i < 1000000; i++)
-    // {
-    //     MoveType type = static_cast<MoveType>(rng() % 4);
-    //     if(localSearch.solution.size() == 1 && type == MoveType::RemoveNode)
-    //         type = MoveType::InsertNode;
-    //     int node1,node2;
-    //     switch (type)
-    //     {
-    //     case MoveType::InsertNode:
-    //         node1 = rng() % dataB.numNodes;
-    //         node2 = rng() % localSearch.solution.size();
-    //         break;
-    //     case MoveType::RemoveNode:
-    //         node1 = localSearch.solution[rng() % localSearch.solution.size()];
-    //         break;
-    //     case MoveType::SwapNodes:
-    //         node1 = localSearch.solution[rng() % localSearch.solution.size()];
-    //         node2 = localSearch.solution[rng() % localSearch.solution.size()];
-    //         break;
-    //     case MoveType::SwapEdges:
-    //         node1 = localSearch.solution[rng() % localSearch.solution.size()];
-    //         node2 = localSearch.solution[rng() % localSearch.solution.size()];
-    //         break;
-    //     }
-    //     mockMove(type, node1, node2);
-    // }
+    // localSearch.print();
 
     // exit(0);
-
+    
     // Experiment
     int numRuns = 100;
     int maxNode = min(dataA.numNodes, dataB.numNodes);
@@ -132,23 +89,15 @@ int main()
     ranges::sample(allNodesView, startingNodes.begin(), maxTestsPossible, rng);
 
     vector<Statistic> scoreStatistics;
-    scoreStatistics.reserve(solvers.size() * localSearches.size());
+    scoreStatistics.reserve(startingPointSolvers.size() * localSearches.size());
     vector<Statistic> timeStatistics;
-    timeStatistics.reserve(solvers.size() * localSearches.size());
-    vector<Statistic> scoreStatisticsForSolver;
-    scoreStatisticsForSolver.reserve(solvers.size());
-    vector<Statistic> timeStatisticsForSolver;
-    timeStatisticsForSolver.reserve(solvers.size());
-    for (auto &solver : solvers)
+    timeStatistics.reserve(startingPointSolvers.size() * localSearches.size());
+    vector<Statistic> scoreStatisticsForKRegret;
+    scoreStatisticsForKRegret.reserve(KRegrets.size());
+    vector<Statistic> timeStatisticsForKRegret;
+    timeStatisticsForKRegret.reserve(KRegrets.size());
+    for (auto &solver : startingPointSolvers)
     {
-        scoreStatisticsForSolver.emplace_back(
-            solver->data->getName(),
-            solver->getAlgorithmName(),
-            "None");
-        timeStatisticsForSolver.emplace_back(
-            solver->data->getName(),
-            solver->getAlgorithmName(),
-            "None");
         for (auto &localSearch : localSearches)
         {
             scoreStatistics.emplace_back(
@@ -161,27 +110,27 @@ int main()
                 localSearch->getAlgorithmName());
         }
     }
+    for (auto &solver : KRegrets)
+    {
+        scoreStatisticsForKRegret.emplace_back(
+            solver->data->getName(),
+            solver->getAlgorithmName(),
+            "None");
+        timeStatisticsForKRegret.emplace_back(
+            solver->data->getName(),
+            solver->getAlgorithmName(),
+            "None");
+    }
 
-    chrono::time_point<chrono::high_resolution_clock> startTime, endTime;
+    chrono::time_point<chrono::steady_clock> startTime, endTime;
     for (int startNode : startingNodes)
     {
-        for (size_t i = 0; i < solvers.size(); i++)
+        for (size_t i = 0; i < startingPointSolvers.size(); i++)
         {
-            const auto &solver = solvers[i];
+            const auto &solver = startingPointSolvers[i];
 
             solver->startNode = startNode;
-
-            startTime = chrono::high_resolution_clock::now();
             solver->solve();
-            endTime = chrono::high_resolution_clock::now();
-
-            if (solver->solutionScore > scoreStatisticsForSolver[i].max)
-            {
-                solver->saveToFile(solver->data->getName());
-            }
-
-            scoreStatisticsForSolver[i].update(solver->solutionScore);
-            timeStatisticsForSolver[i].update(chrono::duration<double, std::milli>(endTime - startTime).count());
 
             for (size_t j = 0; j < localSearches.size(); j++)
             {
@@ -190,9 +139,9 @@ int main()
                 localSearch->data = solver->data;
                 localSearch->solution = solver->solution;
 
-                startTime = chrono::high_resolution_clock::now();
+                startTime = chrono::steady_clock::now();
                 localSearch->improve();
-                endTime = chrono::high_resolution_clock::now();
+                endTime = chrono::steady_clock::now();
 
                 int index = i * localSearches.size() + j;
                 if (localSearch->solutionScore > scoreStatistics[index].max)
@@ -205,80 +154,39 @@ int main()
             }
         }
     }
-    for (auto &stat : scoreStatisticsForSolver)
+    for (int startNode : startingNodes)
+    {
+        for (size_t i = 0; i < KRegrets.size(); i++)
+        {
+            const auto &solver = KRegrets[i];
+
+            solver->startNode = startNode;
+
+            startTime = chrono::steady_clock::now();
+            solver->solve();
+            endTime = chrono::steady_clock::now();
+
+            if (solver->solutionScore > scoreStatisticsForKRegret[i].max)
+            {
+                solver->saveToFile(solver->data->getName());
+            }
+
+            scoreStatisticsForKRegret[i].update(solver->solutionScore);
+            timeStatisticsForKRegret[i].update(chrono::duration<double, std::milli>(endTime - startTime).count());
+        }
+    }
+    for (auto &stat : scoreStatisticsForKRegret)
         stat.average /= maxTestsPossible;
-    for (auto &stat : timeStatisticsForSolver)
+    for (auto &stat : timeStatisticsForKRegret)
         stat.average /= maxTestsPossible;
     for (auto &stat : scoreStatistics)
         stat.average /= maxTestsPossible;
-    double randomTimeLimit = numeric_limits<double>::min();
     for (auto &stat : timeStatistics)
-    {
         stat.average /= maxTestsPossible;
-        randomTimeLimit = max(randomTimeLimit, stat.average);
-    }
     
-    // vector<unique_ptr<RandomLocalSearch>> randomLocalSearches;
-    // randomLocalSearches.reserve(2);
-    // randomLocalSearches.emplace_back(make_unique<RandomLocalSearch>(solvers[0], MoveType::SwapNodes, randomTimeLimit));
-    // randomLocalSearches.emplace_back(make_unique<RandomLocalSearch>(solvers[0], MoveType::SwapEdges, randomTimeLimit));
-
-    // vector<Statistic> scoreStatisticsForRandomLocalSearch;
-    // scoreStatisticsForRandomLocalSearch.reserve(solvers.size() * randomLocalSearches.size());
-    // vector<Statistic> timeStatisticsForRandomLocalSearch;
-    // timeStatisticsForRandomLocalSearch.reserve(solvers.size() * randomLocalSearches.size());
-    // for (auto &solver : solvers)
-    // {
-    //     for (auto &localSearch : randomLocalSearches)
-    //     {
-    //         scoreStatisticsForRandomLocalSearch.emplace_back(
-    //             solver->data->getName(),
-    //             solver->getAlgorithmName(),
-    //             localSearch->getAlgorithmName());
-    //         timeStatisticsForRandomLocalSearch.emplace_back(
-    //             solver->data->getName(),
-    //             solver->getAlgorithmName(),
-    //             localSearch->getAlgorithmName());
-    //     }
-    // }
-    // for (int startNode : startingNodes)
-    // {
-    //     for (size_t i = 0; i < solvers.size(); i++)
-    //     {
-    //         const auto &solver = solvers[i];
-
-    //         solver->startNode = startNode;
-    //         solver->solve();
-
-    //         for (size_t j = 0; j < randomLocalSearches.size(); j++)
-    //         {
-    //             const auto &localSearch = randomLocalSearches[j];
-
-    //             localSearch->data = solver->data;
-    //             localSearch->solution = solver->solution;
-
-    //             startTime = chrono::high_resolution_clock::now();
-    //             localSearch->improve();
-    //             endTime = chrono::high_resolution_clock::now();
-
-    //             int index = i * randomLocalSearches.size() + j;
-    //             if (localSearch->solutionScore > scoreStatistics[index].max)
-    //             {
-    //                 localSearch->saveToFile(format("{}_{}", solver->data->getName(), solver->getAlgorithmName()));
-    //             }
-
-    //             scoreStatisticsForRandomLocalSearch[index].update(localSearch->solutionScore);
-    //             timeStatisticsForRandomLocalSearch[index].update(chrono::duration<double, std::milli>(endTime - startTime).count());
-    //         }
-    //     }
-    // }
-    // for(auto &stat : scoreStatisticsForRandomLocalSearch) stat.average /= maxTestsPossible;
-    // for(auto &stat : timeStatisticsForRandomLocalSearch) stat.average /= maxTestsPossible;
-
     auto allScoreStatistics = {
-        scoreStatisticsForSolver,
+        scoreStatisticsForKRegret,
         scoreStatistics,
-        // scoreStatisticsForRandomLocalSearch
     };
 
     println("\nScore statistics:");
@@ -286,9 +194,8 @@ int main()
         stat.print();
 
     auto allTimeStatistics = {
-        timeStatisticsForSolver,
-        timeStatistics,
-        // timeStatisticsForRandomLocalSearch
+        timeStatisticsForKRegret,
+        timeStatistics
     };
 
     println("\nTime statistics:");
