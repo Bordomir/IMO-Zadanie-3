@@ -92,6 +92,8 @@ public:
     void changeSolution(const Move &move);
     virtual void setMoveSet() = 0;
     virtual void updateMoveSet(const Move &move) = 0;
+    int checkEdge(int node1, int node2);
+    int isMoveApplicable(const Move &move);
 
     int calculateLength();
     int calculateScore();

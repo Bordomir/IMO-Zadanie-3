@@ -6,12 +6,13 @@
 #include <vector>
 #include <numeric>
 #include <algorithm>
+#include <queue>
 
 using namespace std;
 
 string MemorySteepLocalSearch::getAlgorithmName()
 {
-    return format("Steep_{}", neighbourhoodUsed == MoveType::SwapNodes ? "SwapNodes" : "SwapEdges");
+    return format("Memory_Steep_{}", neighbourhoodUsed == MoveType::SwapNodes ? "SwapNodes" : "SwapEdges");
 }
 
 void MemorySteepLocalSearch::setMoveSet()
@@ -19,13 +20,11 @@ void MemorySteepLocalSearch::setMoveSet()
     moveSet.clear();
     int n = solution.size();
 
-    // RemoveNode moves - usunięcie wierzchołka solution[node1]
     for (int i = 0; i < n; i++)
     {
-        addMove<true>(MoveType::RemoveNode, i);
+        addImprovingMove<true>(MoveType::RemoveNode, i);
     }
 
-    // InsertNode moves - wstawienie wierzchołka data[node1] po wierzchołku solution[node2]
     for (int node = 0; node < data->numNodes; node++)
     {
         if (inSolution[node] > -1)
@@ -33,50 +32,169 @@ void MemorySteepLocalSearch::setMoveSet()
 
         if (n == 0)
         {
-            addMove<true>(MoveType::InsertNode, node);
+            addImprovingMove<true>(MoveType::InsertNode, node);
             continue;
         }
 
         for (int i = 0; i < n; i++)
         {
-            addMove<true>(MoveType::InsertNode, node, i);
+            addImprovingMove<true>(MoveType::InsertNode, node, i);
         }
     }
 
-    // SwapNodes moves - zamiana wierzchołków solution[node1] i solution[node2] (node1 < node2)
-    // or SwapEdges moves- zamiana krawędzi solution[node1] -> solution[node1 + 1] z krawędzią solution[node2] -> solution[node2 + 1] (node1 < node2)
     for (int i = 0; i < n; i++)
     {
         for (int j = i + 1; j < n; j++)
         {
-            addMove<true>(neighbourhoodUsed, i, j);
+            addImprovingMove<true>(neighbourhoodUsed, i, j);
         }
     }
+
+    moveSetQueue = priority_queue<Move>(moveSet.begin(), moveSet.end());
+    moveSet.clear();
 }
 
 optional<Move> MemorySteepLocalSearch::chooseMove()
 {
-    if (moveSet.empty())
-        return nullopt;
-
-    Move bestMove = moveSet[0];
-    bestMove.deltaScore = -1;
-    for (Move &move : moveSet)
+    int res = 0;
+    optional<Move> m = nullopt;
+    while(!moveSetQueue.empty() && res != 1)
     {
-        move.deltaScore = calculateDeltaScore(move);
-        if (*move.deltaScore > *bestMove.deltaScore)
+        m = moveSetQueue.top();
+        moveSetQueue.pop();
+        res = isMoveApplicable(*m);
+        if(res == -1)
         {
-            bestMove = move;
+            moveSet.push_back(move(*m));
         }
     }
-    if (*bestMove.deltaScore > 0)
-    {
-        return bestMove;
-    }
+    if(res == 1) return m;
     return nullopt;
 }
 
 void MemorySteepLocalSearch::updateMoveSet(const Move &move)
 {
-    setMoveSet();
+    switch (move.type)
+    {
+        case MoveType::InsertNode:
+        {
+            auto [node, prev, next, u1, u2, u3] = move.nodes;
+
+            // InsertNode moves
+            int nodeIndex = inSolution[node];
+            int prevIndex = getNodeFromSolution(nodeIndex - 1);
+            for (int i = 0; i < data->numNodes; i++)
+            {
+                if (inSolution[i] > -1) continue;
+
+                addImprovingMove<true>(MoveType::InsertNode, i, nodeIndex);
+                addImprovingMove<true>(MoveType::InsertNode, i, prevIndex);
+            }
+
+            // RemoveNode moves
+            addImprovingMove<false>(MoveType::RemoveNode, node);
+            addImprovingMove<false>(MoveType::RemoveNode, prev);
+            addImprovingMove<false>(MoveType::RemoveNode, next);
+
+            // SwapEdges moves
+            addImprovingMove<true>(MoveType::SwapEdges, prevIndex, nodeIndex);
+            int n = solution.size();
+            for (int i = 0; i < n; i++)
+            {
+                if(i == nodeIndex || i == prevIndex) continue;
+                addImprovingMove<true>(MoveType::SwapEdges, i, nodeIndex);
+                addImprovingMove<true>(MoveType::SwapEdges, i, prevIndex);
+            }
+
+            break;
+        }
+        case MoveType::RemoveNode:
+        {
+            auto [node, prev, next, u1, u2, u3] = move.nodes;
+
+            if(solution.empty())
+            {
+                for (int i = 0; i < data->numNodes; i++)
+                {
+                    addImprovingMove<true>(MoveType::InsertNode, i);
+                }
+                break;
+            }
+
+            // InsertNode moves
+            int direction = checkEdge(prev, next);
+            int prevIndex = direction > 0 ? inSolution[prev] : inSolution[next];
+            int nextIndex = direction > 0 ? inSolution[next] : inSolution[prev];
+            for (int i = 0; i < data->numNodes; i++)
+            {
+                if (inSolution[i] > -1) continue;
+
+                addImprovingMove<true>(MoveType::InsertNode, i, prevIndex);
+            }
+            int n = solution.size();
+            for (int i = 0; i < n; i++)
+            {
+                addImprovingMove<true>(MoveType::InsertNode, node, i);
+            }
+
+            // RemoveNode moves
+            addImprovingMove<true>(MoveType::RemoveNode, prevIndex);
+            addImprovingMove<true>(MoveType::RemoveNode, nextIndex);
+
+            // SwapEdges moves
+            for (int i = 0; i < n; i++)
+            {
+                if(i == prevIndex) continue;
+                addImprovingMove<true>(MoveType::SwapEdges, i, prevIndex);
+            }
+
+            break;
+        }
+        case MoveType::SwapNodes:
+        {
+            // auto [p1, c1, n1, p2, c2, n2] = move.nodes;
+            // Not used in this local search
+            break;
+        }
+        case MoveType::SwapEdges:
+        {
+            auto [c1, n1, c2, n2, u1, u2] = move.nodes;
+
+            // InsertNode moves
+            int node1Index = inSolution[c1];
+            int node2Index = inSolution[n1];
+            for (int i = 0; i < data->numNodes; i++)
+            {
+                if (inSolution[i] > -1) continue;
+
+                addImprovingMove<true>(MoveType::InsertNode, i, node1Index);
+                addImprovingMove<true>(MoveType::InsertNode, i, node2Index);
+            }
+
+            // RemoveNode moves
+            addImprovingMove<true>(MoveType::RemoveNode, node1Index);
+            addImprovingMove<true>(MoveType::RemoveNode, node2Index);
+            addImprovingMove<false>(MoveType::RemoveNode, c2);
+            addImprovingMove<false>(MoveType::RemoveNode, n2);
+
+            // SwapEdges moves
+            addImprovingMove<true>(MoveType::SwapEdges, node1Index, node2Index);
+            int n = solution.size();
+            for (int i = 0; i < n; i++)
+            {
+                if(i == node1Index || i == node2Index) continue;
+                addImprovingMove<true>(MoveType::SwapEdges, i, node1Index);
+                addImprovingMove<true>(MoveType::SwapEdges, i, node2Index);
+            }
+
+            break;
+        }
+    }
+    extendQueue();
+    moveSet.clear();
+}
+
+void MemorySteepLocalSearch::extendQueue()
+{
+    moveSetQueue.push_range(moveSet);
 }
