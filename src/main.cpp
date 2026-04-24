@@ -64,7 +64,7 @@ int main()
     localSearches.reserve(3);
     localSearches.emplace_back(make_unique<SteepLocalSearch>(startingPointSolvers[0], MoveType::SwapEdges));
     localSearches.emplace_back(make_unique<MemorySteepLocalSearch>(startingPointSolvers[0], MoveType::SwapEdges));
-    localSearches.emplace_back(make_unique<CandidateSteepLocalSearch>(startingPointSolvers[0], MoveType::SwapEdges));
+    localSearches.emplace_back(make_unique<CandidateSteepLocalSearch>(startingPointSolvers[0], 10));
     mt19937 rng{42};
 
     // unique_ptr<Solver> randomSolverA = make_unique<RandomSolver>(dataA, startNode);

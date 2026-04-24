@@ -18,6 +18,8 @@ string MemorySteepLocalSearch::getAlgorithmName()
 void MemorySteepLocalSearch::setMoveSet()
 {
     moveSet.clear();
+    removedMoves.clear();
+    validMoves.clear();
     moveSetQueue = priority_queue<int, vector<int>, MoveIndexComparator>(MoveIndexComparator{&moveSet});
     
     int n = solution.size();
@@ -51,9 +53,6 @@ void MemorySteepLocalSearch::setMoveSet()
             addImprovingMove<true>(neighbourhoodUsed, i, j);
         }
     }
-
-    removedMoves = vector<int>();
-    validMoves = vector<int>();
 }
 
 optional<Move> MemorySteepLocalSearch::chooseMove()
