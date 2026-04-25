@@ -8,15 +8,22 @@
 #include "DataLoader.hpp"
 #include "Solver.hpp"
 
-using namespace std;
 
 class CandidateSteepLocalSearch : public LocalSearch
 {
 public:
-    CandidateSteepLocalSearch(unique_ptr<Solver> &solver, MoveType neighbourhood = MoveType::SwapEdges) : LocalSearch(solver, neighbourhood) {};
-    CandidateSteepLocalSearch(DataLoader &data, vector<int> solution, MoveType neighbourhood = MoveType::SwapEdges) : LocalSearch(data, solution, neighbourhood) {};
-    string getAlgorithmName() override;
+    CandidateSteepLocalSearch(std::unique_ptr<Solver>& solver, int k);
+
+    std::string getAlgorithmName() override;
+
     void setMoveSet() override;
-    optional<Move> chooseMove() override;
-    void updateMoveSet(const Move &move) override;
+    std::optional<Move> chooseMove() override;
+    void updateMoveSet(const Move& move) override;
+
+private:
+    std::vector<std::vector<int>> candidates_;
+    int k_;
+
+    void initializeCandidates();
+    void generateCandidateMoves();
 };
