@@ -18,9 +18,9 @@ string MemorySteepLocalSearch::getAlgorithmName()
 void MemorySteepLocalSearch::setMoveSet()
 {
     moveSet.clear();
-    removedMoves.clear();
-    validMoves.clear();
     moveSetQueue = priority_queue<int, vector<int>, MoveIndexComparator>(MoveIndexComparator{&moveSet});
+    removedMoves = vector<int>();
+    validMoves = vector<int>();
     
     int n = solution.size();
 
@@ -53,6 +53,7 @@ void MemorySteepLocalSearch::setMoveSet()
             addImprovingMove<true>(neighbourhoodUsed, i, j);
         }
     }
+
 }
 
 optional<Move> MemorySteepLocalSearch::chooseMove()
@@ -175,12 +176,16 @@ void MemorySteepLocalSearch::updateMoveSet(const Move &move)
             // InsertNode moves
             int node1Index = inSolution[c1];
             int node2Index = inSolution[n1];
+            int new1 = inSolution[c2];
+            int new2 = inSolution[n2];
             for (int i = 0; i < data->numNodes; i++)
             {
                 if (inSolution[i] > -1) continue;
 
                 addImprovingMove<true>(MoveType::InsertNode, i, node1Index);
                 addImprovingMove<true>(MoveType::InsertNode, i, node2Index);
+                addImprovingMove<true>(MoveType::InsertNode, i, new1);
+                addImprovingMove<true>(MoveType::InsertNode, i, new2);
             }
 
             // RemoveNode moves
@@ -191,12 +196,19 @@ void MemorySteepLocalSearch::updateMoveSet(const Move &move)
 
             // SwapEdges moves
             addImprovingMove<true>(MoveType::SwapEdges, node1Index, node2Index);
+            addImprovingMove<true>(MoveType::SwapEdges, node1Index, new1);
+            addImprovingMove<true>(MoveType::SwapEdges, node1Index, new2);
+            addImprovingMove<true>(MoveType::SwapEdges, node2Index, new1);
+            addImprovingMove<true>(MoveType::SwapEdges, node2Index, new2);
+            addImprovingMove<true>(MoveType::SwapEdges, new1, new2);
             int n = solution.size();
             for (int i = 0; i < n; i++)
             {
-                if(i == node1Index || i == node2Index) continue;
+                if(i == node1Index || i == node2Index || i == new1 || i == new2) continue;
                 addImprovingMove<true>(MoveType::SwapEdges, i, node1Index);
                 addImprovingMove<true>(MoveType::SwapEdges, i, node2Index);
+                addImprovingMove<true>(MoveType::SwapEdges, i, new1);
+                addImprovingMove<true>(MoveType::SwapEdges, i, new2);
             }
 
             break;

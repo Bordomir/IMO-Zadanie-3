@@ -118,6 +118,7 @@ void CandidateSteepLocalSearch::generateCandidateMoves()
             else
             {
                 addMove<true>(neighbourhoodUsed, i, j);
+                addMove<true>(neighbourhoodUsed, getNodeFromSolution(inSolution[i] - 1),  getNodeFromSolution(inSolution[j] - 1));
             }
         }
     }
